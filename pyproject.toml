@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "direct-diverse-optimization"
+version = "0.1.0"
+description = "Native, config-driven implementation of Direct Diversity Optimization."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0",
+  "numpy>=1.26,<2.0",
+  "omegaconf>=2.3",
+  "openai>=1.30",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+train = [
+  "accelerate>=0.29",
+  "datasets>=2.18",
+  "peft>=0.11",
+  "safetensors>=0.4",
+  "torch>=2.3",
+  "transformers>=4.51",
+  "trl>=0.9",
+]
+paper = [
+  "accelerate>=0.29",
+  "datasets>=2.18",
+  "peft>=0.11",
+  "safetensors>=0.4",
+  "torch>=2.3",
+  "transformers>=4.51",
+  "trl>=0.9",
+  "vllm>=0.8",
+  "beautifulsoup4>=4.11",
+  "cleantext==1.1.4",
+  "Flask>=2.1",
+  "huggingface_hub>=0.32",
+  "gym==0.23",
+  "gymnasium>=0.29,<1.0",
+  "pandas>=1.4",
+  "Pillow>=9.0",
+  "pyserini==0.17.0",
+  "rank-bm25>=0.2.2",
+  "requests>=2.27",
+  "scikit-learn>=1.1",
+  "selenium>=4.2",
+  "spacy>=3.3",
+  "thefuzz>=0.19",
+  "minigrid @ git+https://github.com/BartekCupial/Minigrid.git@cf73dd148e51276bd675a37e3bfb0bf2b42329b2",
+  "baba @ git+https://github.com/nacloos/baba-is-ai.git@33c2ca184a6b41bba03a910574b7111c07792003",
+]
+
+[tool.setuptools.packages.find]
+include = ["ddo*"]

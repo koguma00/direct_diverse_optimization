@@ -1,0 +1,73 @@
+# Camera-ready main-result evaluation defaults. Every evaluation/serving option can be changed here.
+# benchmark/task/method values are the same as configs/training.yaml.
+benchmark: babyai
+task: goto
+method: ddo
+
+# Remove checkpoint only for method: base.
+checkpoint: checkpoints/babyai/goto/ddo
+results_dir: results/babyai/goto/ddo
+gpu_ids: [0]
+num_workers: 8
+seed: 20260305
+
+models:
+  target: Qwen/Qwen3-1.7B
+  expert: Qwen/Qwen3.5-122B-A10B-FP8
+  reference: Qwen/Qwen3-1.7B
+  target_base_url: null             # Required when evaluation.server_mode is external.
+  expert_base_url: null
+
+decoding:
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 8192
+  max_text_history: 16
+
+evaluation:
+  protocol: standard
+  suites: [success, h_esd, esd]
+  rollout_budget: 20
+  performance_rollouts: 50
+  diversity_rollouts: 20
+  max_steps_per_episode: 100
+  temperature: 0.6                 # Overrides decoding.temperature.
+  top_p: 0.95                      # Overrides decoding.top_p.
+  max_tokens: 8192                 # Overrides decoding.max_tokens.
+  max_text_history: 16             # Overrides decoding.max_text_history.
+  seeds: [20260305, 20260306, 20260307]
+  webshop_performance_session_start: 500 # Paper success evaluation uses sessions 500--549.
+  webshop_diversity_sessions: [500, 501, 502]
+  webshop_performance_num_workers: 2 # Historical headline run used two evaluation workers.
+  webshop_diversity_num_workers: 1   # Historical fixed-session 3x20 runner was sequential.
+  webshop_num_products: 0            # Full WebShop product pool.
+  webshop_human_goals: true          # Official held-out human instructions.
+  webshop_max_search_queries: 6
+  webshop_max_tokens: 256
+  webshop_max_text_history: 8
+  webshop_client_timeout: 900
+  webshop_client_max_retries: 1
+  webshop_client_delay: 2.0
+  webshop_disable_thinking: true
+  webshop_success_threshold: 0.9
+  webshop_trajectory_class: purchase_action_type_trace # purchase_signature | action_trace | action_type_trace | purchase_action_type_trace
+  llm_seed_base: null
+  webshop_diversity_llm_seed_base: null
+
+  server_mode: managed             # managed | external
+  server_host: 127.0.0.1
+  server_port: 18920
+  server_ready_timeout: 900
+  server_poll_interval: 5.0
+  server_max_model_len: 40960
+  server_max_num_seqs: 8              # Paper vLLM serving limit.
+  server_max_num_batched_tokens: 4096 # Paper vLLM scheduler token budget.
+  server_gpu_memory_utilization: 0.85
+  server_reasoning_parser: qwen3   # null disables the parser.
+  server_dtype: bfloat16           # auto | bfloat16 | float16 | float32
+  server_tensor_parallel_size: 1
+  server_enforce_eager: false       # true skips CUDA graph capture for faster startup but slower inference.
+
+  client_timeout: 180
+  client_max_retries: 1            # One additional same-step attempt, matching the paper evaluator.
+  client_delay: 1.0                # Used by the WebShop client.

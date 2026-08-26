@@ -1,0 +1,30 @@
+agent:
+  type: thought_action
+  max_text_history: 16
+  max_image_history: 0
+  max_cot_history: 1
+client:
+  client_name: vllm
+  model_id: Qwen/Qwen3-1.7B
+  base_url: http://127.0.0.1:8000/v1
+  generate_kwargs:
+    temperature: 0.6
+    top_p: 0.95
+    max_tokens: 8192
+    seed: null
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
+  timeout: 60
+  max_retries: 1
+eval:
+  feedback_on_invalid_action: true
+envs:
+  names: babyai
+  env_kwargs:
+    seed: 20260305
+    seed_mode: per_episode
+  babyai_kwargs:
+    num_dists: 0
+  babaisai_kwargs:
+    add_ruleset: true

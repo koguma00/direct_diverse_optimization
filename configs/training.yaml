@@ -1,0 +1,170 @@
+# Camera-ready main-result defaults. Every executable stage option can be changed here.
+# benchmark: babyai | babaisai | webshop
+# task: BabyAI = goto | pickup | open | comp
+#       BabaIsAI = basic (goto) | room (two-room goto) | stop (two-room break-stop goto)
+#                    | flex (two-room optional break-stop goto); WebShop = webshop
+# method: base | reference | dpo | divfreq | divprob | tiedpo_rk | tiedpo_dav | ddo
+benchmark: babyai
+task: goto
+method: ddo
+
+# scratch = base + SFT + DTC + dataset + preference training
+# dtc = dataset + preference training; dataset = preference training only
+start_from: dtc  # scratch | dtc | dataset
+
+paths:
+  base_trajectories: trajectories/base/babyai/goto
+  dtc: trajectories/dtc/babyai/goto
+  preference_dataset: datasets/babyai/goto/ddo
+  reference_checkpoint: checkpoints/babyai/goto/reference
+  output_checkpoint: checkpoints/babyai/goto/ddo
+  work_dir: .runs/babyai/goto/ddo
+  results_dir: results/babyai/goto/ddo
+
+gpu_ids: [0]
+num_workers: 8
+seed: 42
+
+models:
+  target: Qwen/Qwen3-1.7B
+  expert: Qwen/Qwen3.5-122B-A10B-FP8
+  reference: Qwen/Qwen3-1.7B
+  expert_base_url: http://127.0.0.1:8080/v1
+  target_base_url: null
+
+# Shared generation defaults. base.* and collection.* may override each field.
+decoding:
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 8192
+  max_text_history: 16
+
+base:
+  source_dir: null                 # Reuse one existing base-trajectory directory.
+  source_dirs: []                  # Or merge several directories; mutually exclusive with source_dir.
+  num_episodes: 100
+  max_steps_per_episode: null      # null = benchmark default
+  seed: 42000                      # Fixed collection seed derived from 42; disjoint from evaluation seeds.
+  seed_mode: per_episode           # fixed | per_episode
+  agent_type: thought_action       # DDO public adapter supports thought_action.
+  client_timeout: 300.0            # Seconds per model request; raise for long reasoning outputs.
+  client_max_retries: 1            # Retries inside the API client.
+  client_delay: 1.0                # WebShop client delay in seconds; ignored by BALROG.
+  # temperature, top_p, max_tokens, max_text_history may be set here.
+
+collection:
+  divergence_count: 5              # K_d; any positive integer.
+  alt_budget: 3                    # K_a; any positive integer.
+  # random = sample the divergent action; request = ask the expert to choose it.
+  # random_teacher = sample the action, then ask the expert for its reasoning.
+  # WebShop only: structured = prefer domain-aware alternatives of the same action type.
+  alt_mode: random                 # random | request | random_teacher | structured (WebShop only)
+  step_sampling_mode: uniform      # uniform | random
+  success_only: true               # DTC branches only from successful base trajectories.
+  rollout_max_steps: null          # null = no absolute override
+  rollout_extra_steps: 10
+  # For WebShop, these override alternative-rollout generation.
+  # BALROG alternatives reuse the generation config stored with each base trajectory.
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 8192
+  max_text_history: 16
+  client_timeout: 300.0            # DTC request timeout override.
+  client_max_retries: 1            # Retries inside the API client.
+  client_delay: 1.0                # WebShop only.
+  external_retry_attempts: 1       # Resume failed BALROG branch jobs once.
+
+dataset:
+  criterion: auto                  # auto | terminal_progression | textworld_task_progression_v1 | webshop_reward_threshold
+  usable_trajectories: base-alt    # base-alt | base-alt-alt
+  quality_score: max_same_obs_action_run
+  quality_threshold: 999999        # null disables the quality threshold.
+  max_families: 0                  # 0 = all episode families
+  include_base_alt_win_pseudo_pairs: false
+  alpha: 0.5
+  target_beta: 0.1
+  ref_device: cuda                 # auto | cpu | cuda
+  reference_response_scope: action_only # action_only | full (full includes reasoning text)
+  reference_normalize: sum         # sum | mean
+  action_freq_scope: state         # state | task
+  probability_response_scope: action_only # action_only | full
+  probability_normalize: mean      # mean | sum
+  tie_target: 0.5
+  success_threshold: 0.9            # WebShop success threshold for base, SFT, DTC, and dataset filtering.
+
+# Shared LoRA defaults. Any lora_* field in sft/preference overrides the shared value.
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+sft:
+  source_shuffle_seed: null
+  finetune_type: lora
+  # BabyAI/BabaIsAI: use a 20-epoch linear scheduler and retain the epoch-10 policy.
+  # WebShop overrides: learning_rate=2e-5, batch_size=1, accumulation=8, max_length=4096.
+  learning_rate: 1.0e-4
+  num_train_epochs: 20             # Scheduler horizon; stop_after_epochs controls processed epochs.
+  stop_after_epochs: 10
+  max_steps: -1
+  warmup_ratio: 0.05
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  max_length: 2048
+  logging_steps: 10
+  save_steps: 200
+  save_epochs_fraction: 0.5          # Retain half-epoch recovery points.
+  save_total_limit: 8
+  dataloader_num_workers: 8
+  bf16: true
+  fp16: false
+  gradient_checkpointing: false
+  torch_dtype: bfloat16            # auto | bfloat16 | float16 | float32
+  seed: null                       # null = top-level seed
+  train_adapter_path: null
+  resume_from_checkpoint: null     # Trainer checkpoint directory, e.g. work/.../trainer_run/checkpoint-1000
+  validate_only: false
+  # Optional per-stage LoRA overrides:
+  # lora_r: 32
+  # lora_alpha: 32
+  # lora_dropout: 0.05
+  # lora_target_modules: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
+
+preference:
+  finetune_type: lora              # lora | full
+  beta: 0.1
+  dpo_rk_alpha: 1.0986122886681098
+  dpo_d_nu: 1.0
+  ddo_objective: reference_relative # reference_relative (paper) | squared_gap | upward_floor
+  lambda_div: 1.0                  # Used by squared_gap and upward_floor.
+  lambda_floor: 0.0                # Used only by upward_floor.
+  # train_adapter_path/ref_adapter_path default to paths.reference_checkpoint; set them here only to override it.
+  learning_rate: 5.0e-6
+  num_train_epochs: 5              # Paper: 5 for BabyAI/BabaIsAI, 15 for WebShop.
+  max_steps: -1
+  warmup_ratio: 0.03
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  lr_scheduler_type: linear
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  max_prompt_length: 2048
+  max_length: 2304
+  logging_steps: 10
+  save_steps: 200
+  save_epochs_fraction: null
+  stop_after_epochs: null
+  save_total_limit: 8
+  dataloader_num_workers: 8
+  bf16: true
+  fp16: false
+  gradient_checkpointing: false
+  torch_dtype: bfloat16            # auto | bfloat16 | float16 | float32
+  seed: null                       # null = top-level seed
+  resume_from_checkpoint: null
+  validate_only: false
+  # Optional per-stage LoRA overrides use the same four lora_* keys shown under sft.
